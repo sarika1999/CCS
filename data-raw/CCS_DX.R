@@ -18,7 +18,7 @@ download_extract(url = "https://www.hcup-us.ahrq.gov/toolssoftware/ccs/Multi_Lev
 CCS_ICD9_DX <- read_csv("data-raw/ccs_multi_dx_tool_2015.csv", 
                         col_types = cols(.default = col_character()))
 
-
+#create new variables 
 CCS_ICD9_DX_L2 <- CCS_ICD9_DX %>% 
   mutate(code = str_trim(str_remove_all(`'ICD-9-CM CODE'`, "'")),
          code_type = "ICD9CM",
@@ -27,7 +27,9 @@ CCS_ICD9_DX_L2 <- CCS_ICD9_DX %>%
          code_chapter = `'CCS LVL 1 LABEL'`,
          cat_code = as.integer(str_extract(label, "(?<=\\[).+?(?=\\])")),
          cat_desc = sub("\\s*\\[.*", "", label)) %>% 
+  #subset rows that meet certain condition (subset rows that have [#.])
   filter(str_detect(label, '\\[')) %>% 
+  #only keep the columns listed below  
   select(code_chapter, code, code_type, L2code, cat_code, cat_desc )
 
 
@@ -42,10 +44,11 @@ CCS_ICD9_DX_L3 <- CCS_ICD9_DX %>%
   filter(str_detect(label, '\\[')) %>% 
   select(code_chapter, code, code_type, L2code, cat_code, cat_desc )
 
-
+#put dataframes together 
 CCS_ICD9DX_cat <- CCS_ICD9_DX_L2 %>% 
   bind_rows(CCS_ICD9_DX_L3) %>% 
   select(code_chapter, cat_code, L2code, cat_desc) %>% 
+  #pull distinct rows 
   unique()
 
 CCS_ICD9_DXmap <- CCS_ICD9_DX_L2 %>% 
@@ -81,6 +84,7 @@ CCS_ICD10_DXcat <- CCS_ICD10_DX %>%
 
 CCS_ICD10_DXmap <- CCS_ICD10_DX %>% 
   select(cat_code = "'CCS CATEGORY'", icd_code = "'ICD-10-CM CODE'") %>% 
+  #mutate + select in one step (create new columns + delete old) 
   transmute(category_code = as.integer(str_remove_all(cat_code, "'")),
             code = str_remove_all(icd_code, "'"),
             vocabulary_id = "ICD10CM") %>% 
@@ -94,7 +98,8 @@ CCS_ICD10_DXmap <- CCS_ICD10_DX %>%
 ###
 ##########################################################
 
-CCS_DX_categories <- CCS_ICD10_DXcat %>% 
+CCS_DX_categories <- CCS_ICD10_DXcat %>%
+  #keep all values and fill in NA's for any missing
   full_join(CCS_ICD9DX_cat, by = c("cat_code", "L2code")) %>% 
   transmute(code_chapter = ifelse(is.na(code_chapter.x), code_chapter.y, code_chapter.x),
             code_chapter = ifelse(cat_code == 150, "Diseases of the digestive system",  
@@ -106,6 +111,7 @@ CCS_DX_categories <- CCS_ICD10_DXcat %>%
   unique()
 
 
+#bind together "completed" mappings 
 CCS_DX_mapping <- bind_rows(CCS_ICD9_DXmap, CCS_ICD10_DXmap)
 
 
@@ -116,7 +122,7 @@ CCS_DX_mapping <- bind_rows(CCS_ICD9_DXmap, CCS_ICD10_DXmap)
 
 
 
-
+#for use in package 
 usethis::use_data(CCS_DX_categories, overwrite=TRUE)
 usethis::use_data(CCS_DX_mapping, overwrite=TRUE)
 
